@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebGIS Sleman</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  height: 100vh; overflow: hidden;
+  background: #0d1117;
+}
+
+#map { width:100%; height:100vh; }
+
+/* ── Leaflet overrides ── */
+.leaflet-control-zoom {
+  border: none !important;
+  margin: 12px !important;
+  box-shadow: none !important;
+}
+.leaflet-control-zoom a {
+  width: 30px !important; height: 30px !important;
+  line-height: 30px !important;
+  background: #1c2333 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #2d3748 !important;
+  font-size: 18px !important;
+  border-radius: 6px !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  font-weight: 400 !important;
+  text-decoration: none !important;
+  transition: background 0.15s !important;
+}
+.leaflet-control-zoom a:hover {
+  background: #2d3748 !important;
+  color: #fff !important;
+}
+.leaflet-control-zoom-in { margin-bottom: 3px !important; }
+.leaflet-control-attribution {
+  background: rgba(13,17,23,0.7) !important;
+  color: #475569 !important; font-size: 10px !important;
+  border-radius: 6px 0 0 0 !important; padding: 2px 7px !important;
+}
+.leaflet-control-attribution a { color: #64748b !important; }
+
+/* ── Panel ── */
+#panel {
+  position: absolute; top: 12px; left: 12px; z-index: 1000;
+  width: 224px;
+  background: #1a2236;
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+
+.panel-title {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 10px 13px;
+  background: #141e2f;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.panel-title-txt {
+  font-size: 13.5px; font-weight: 700;
+  color: #38bdf8; letter-spacing: 0.01em;
+}
+.collapse-btn {
+  background: none; border: none; cursor: pointer;
+  color: #475569; font-size: 18px; line-height: 1;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; transition: background 0.15s;
+}
+.collapse-btn:hover { background: rgba(255,255,255,0.07); color: #94a3b8; }
+
+.panel-body { padding: 12px 11px; }
+
+/* section label */
+.slbl {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #3b4d68;
+  margin-bottom: 5px; padding-left: 1px;
+}
+
+/* select */
+.sel-wrap { position: relative; margin-bottom: 11px; }
+.sel-wrap select {
+  width: 100%; appearance: none;
+  background: #0f172a; border: 1px solid #263044;
+  color: #cbd5e1; font-family: 'Inter', sans-serif;
+  font-size: 12px; font-weight: 500;
+  padding: 7px 28px 7px 9px;
+  border-radius: 7px; cursor: pointer; outline: none;
+  transition: border-color 0.15s;
+}
+.sel-wrap select:hover { border-color: #38bdf8; }
+.sel-wrap select:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56,189,248,0.1); }
+.sel-arrow {
+  position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  color: #3b4d68; font-size: 10px; pointer-events: none;
+}
+
+.hr { height: 1px; background: rgba(255,255,255,0.06); margin: 9px 0; }
+
+/* layer row */
+.lrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 7px; border-radius: 7px;
+  cursor: pointer; transition: background 0.12s;
+  margin-bottom: 2px;
+}
+.lrow:hover { background: rgba(255,255,255,0.05); }
+
+.chk {
+  width: 15px; height: 15px; border-radius: 4px;
+  border: 1.5px solid #2d3f58; background: #0f172a;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.14s; font-size: 9px; color: #fff;
+}
+.chk.wms { background: #ef4444; border-color: #ef4444; }
+.chk.wfs { background: #22c55e; border-color: #22c55e; }
+
+.linfo { flex: 1; min-width: 0; }
+.lname { font-size: 12px; font-weight: 600; color: #dde3ed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lsub  { font-size: 10px; color: #3b4d68; margin-top: 1px; }
+
+.ltag {
+  font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 4px; flex-shrink: 0;
+}
+.ltag.wms { background: rgba(239,68,68,0.15); color: #f87171; }
+.ltag.wfs { background: rgba(34,197,94,0.12); color: #4ade80; }
+
+/* opacity */
+.oprow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 2px 7px 7px; margin-top: -1px;
+}
+.oplbl { font-size: 10px; color: #3b4d68; width: 42px; flex-shrink: 0; }
+.opslider {
+  flex: 1; height: 3px; accent-color: #38bdf8; cursor: pointer;
+}
+.opval { font-size: 10px; color: #38bdf8; width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── GFI button ── */
+#gfi-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 1000;
+  background: #1a2236; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px; padding: 7px 12px;
+  color: #64748b; font-family: 'Inter', sans-serif;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  transition: all 0.15s;
+}
+#gfi-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+#gfi-btn.on  { border-color: #ef4444; color: #f87171; background: rgba(239,68,68,0.1); }
+.gfi-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── Popup ── */
+.custom-popup .leaflet-popup-content-wrapper {
+  background: #1a2236 !important;
+  border: 1px solid rgba(255,255,255,0.09) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.65) !important;
+  padding: 0 !important; color: #e2e8f0 !important;
+}
+.custom-popup .leaflet-popup-tip { background: #1a2236 !important; }
+.custom-popup .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+.custom-popup .leaflet-popup-close-button {
+  top: 8px !important; right: 9px !important;
+  color: #475569 !important; font-size: 16px !important;
+}
+
+.pu-wrap { min-width: 180px; max-width: 260px; }
+.pu-head {
+  padding: 9px 30px 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; gap: 7px;
+}
+.pu-title { font-size: 12px; font-weight: 700; color: #f1f5f9; }
+.pu-body  { padding: 8px 12px 10px; max-height: 200px; overflow-y: auto; }
+.pu-row   { display: flex; gap: 8px; font-size: 11px; margin-bottom: 4px; line-height: 1.4; }
+.pu-k { color: #475569; min-width: 72px; flex-shrink: 0; }
+.pu-v { color: #cbd5e1; font-weight: 500; word-break: break-word; }
+
+/* ── Status bar ── */
+#sbar {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 999;
+  background: rgba(13,17,23,0.84); backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding: 5px 14px;
+  display: flex; align-items: center; gap: 14px;
+  font-size: 10.5px; color: #3b4d68;
+  font-family: 'Inter', monospace;
+}
+.si { display: flex; align-items: center; gap: 5px; }
+.sd { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+#coord { margin-left: auto; }
+
+/* ── Loading ── */
+#wfs-load {
+  position: absolute; bottom: 34px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; background: rgba(26,34,54,0.95);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  padding: 7px 14px; font-size: 11px; color: #94a3b8;
+  display: none; align-items: center; gap: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+#wfs-load.show { display: flex; }
+.spin {
+  width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.08);
+  border-top-color: #38bdf8; border-radius: 50%;
+  animation: sp 0.7s linear infinite;
+}
+@keyframes sp { to { transform: rotate(360deg); } }
+
+.gfi-cur * { cursor: crosshair !important; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Panel -->
+<div id="panel">
+  <div class="panel-title">
+    <span class="panel-title-txt">WebGIS Sleman</span>
+    <button class="collapse-btn" id="cbtn" onclick="collapsePanel()">−</button>
+  </div>
+  <div class="panel-body" id="pbody">
+
+    <div class="slbl">Basemap</div>
+    <div class="sel-wrap">
+      <select id="bm-sel" onchange="changeBasemap(this.value)">
+        <option value="satellite">Satellite</option>
+        <option value="osm">OpenStreetMap</option>
+        <option value="dark">Dark</option>
+        <option value="topo">Topo</option>
+      </select>
+      <span class="sel-arrow">▾</span>
+    </div>
+
+    <div class="slbl">Layer WMS</div>
+    <div class="lrow" onclick="toggleWMS()">
+      <div class="chk wms" id="chk-wms">✓</div>
+      <div class="linfo">
+        <div class="lname">Zona Gempa Bumi</div>
+        <div class="lsub">Sleman 2017 — raster</div>
+      </div>
+      <span class="ltag wms">WMS</span>
+    </div>
+    <div class="oprow">
+      <span class="oplbl">Opasitas</span>
+      <input type="range" class="opslider" id="wms-op" min="0" max="100" value="80"
+        oninput="setWMSOp(this.value)" onclick="event.stopPropagation()">
+      <span class="opval" id="wms-opv">80%</span>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="slbl">Layer WFS</div>
+    <div class="lrow" onclick="toggleWFS()">
+      <div class="chk wfs" id="chk-wfs">✓</div>
+      <div class="linfo">
+        <div class="lname">Penggunaan Lahan 2022</div>
+        <div class="lsub">Penutup lahan — vektor</div>
+      </div>
+      <span class="ltag wfs">WFS</span>
+    </div>
+    <div class="oprow">
+      <span class="oplbl">Opasitas</span>
+      <input type="range" class="opslider" id="wfs-op" min="0" max="100" value="70"
+        oninput="setWFSOp(this.value)" onclick="event.stopPropagation()">
+      <span class="opval" id="wfs-opv">70%</span>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="slbl">Filter Penggunaan Lahan</div>
+    <div class="sel-wrap" style="margin-bottom:0">
+      <select id="lu-filter" onchange="filterLU(this.value)">
+        <option value="">Semua Jenis</option>
+        <option value="sawah">Sawah / Padi</option>
+        <option value="permukiman">Permukiman</option>
+        <option value="pertanian">Pertanian</option>
+        <option value="hutan">Hutan</option>
+        <option value="kebun">Kebun / Tegalan</option>
+        <option value="industri">Industri</option>
+        <option value="perdagangan">Perdagangan / Jasa</option>
+        <option value="air">Sungai / Air</option>
+        <option value="fasilitas">Fasilitas Umum</option>
+      </select>
+      <span class="sel-arrow">▾</span>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="slbl">Zoom ke Area</div>
+    <div class="sel-wrap" style="margin-bottom:0">
+      <select id="area-sel" onchange="zoomArea(this.value)">
+        <option value="sleman">Sleman (semua)</option>
+        <option value="depok">Kec. Depok</option>
+        <option value="mlati">Kec. Mlati</option>
+        <option value="gamping">Kec. Gamping</option>
+        <option value="godean">Kec. Godean</option>
+        <option value="berbah">Kec. Berbah</option>
+        <option value="ngemplak">Kec. Ngemplak</option>
+      </select>
+      <span class="sel-arrow">▾</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- GFI Button -->
+<button id="gfi-btn" onclick="toggleGFI()">
+  <span class="gfi-dot"></span>GetFeatureInfo
+</button>
+
+<!-- Loading -->
+<div id="wfs-load"><div class="spin"></div>Memuat WFS…</div>
+
+<!-- Status bar -->
+<div id="sbar">
+  <div class="si"><div class="sd" style="background:#ef4444"></div>WMS: Gempa Bumi</div>
+  <div class="si"><div class="sd" style="background:#22c55e"></div>WFS: Penggunaan Lahan 2022</div>
+  <span id="feat-count">–</span>
+  <span id="coord">Geser peta…</span>
+</div>
+
+<script>
+const GS       = 'https://geoportal.slemankab.go.id/geoserver';
+const WMS_LYR  = 'geonode:3404_50kb_ar_gempa_bumi_sleman_2017';
+const WFS_LYR  = 'geonode:3404_50kb_ar_penggunaan_lahan_2022';
+
+const AREAS = {
+  sleman:   { c: [-7.67,  110.47], z: 11 },
+  depok:    { c: [-7.75,  110.40], z: 13 },
+  mlati:    { c: [-7.72,  110.35], z: 13 },
+  gamping:  { c: [-7.78,  110.30], z: 13 },
+  godean:   { c: [-7.78,  110.35], z: 13 },
+  berbah:   { c: [-7.77,  110.49], z: 13 },
+  ngemplak: { c: [-7.69,  110.48], z: 13 },
+};
+
+// ── Basemaps ──────────────────────────────
+const BM = {
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution: '© Esri', maxZoom: 19 }),
+  osm:  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OSM', maxZoom: 19 }),
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution: '© CartoDB', maxZoom: 19 }),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenTopoMap', maxZoom: 17 }),
+};
+let curBM = 'satellite';
+
+const map = L.map('map', {
+  center: [-7.67, 110.47], zoom: 11,
+  zoomControl: true,
+  layers: [BM.satellite],
+});
+
+// coord tracker
+map.on('mousemove', e => {
+  document.getElementById('coord').textContent =
+    `${e.latlng.lat.toFixed(5)}°, ${e.latlng.lng.toFixed(5)}°`;
+});
+
+// ── WMS ───────────────────────────────────
+const wmsLayer = L.tileLayer.wms(`${GS}/geonode/wms`, {
+  layers: WMS_LYR, format: 'image/png',
+  transparent: true, version: '1.1.1', opacity: 0.8,
+  attribution: 'GeoServer WMS',
+});
+wmsLayer.addTo(map);
+
+// ── WFS ───────────────────────────────────
+let wfsGJ = null, wfsOp = 0.7, wfsOn = true, selLayer = null;
+
+const PRIORITY = ['NAMOBJ','namobj','REMARK','remark','LUASAN','luasan',
+  'LUAS','luas','KECAMATAN','kecamatan','DESA','desa','KODOBJ','kodobj'];
+
+// Land-use color palette keyed by keyword matches in the class name
+const LU_COLORS = {
+  'sawah':       '#4ade80',   // paddy — light green
+  'padi':        '#4ade80',
+  'pertanian':   '#86efac',   // agriculture — pale green
+  'kebun':       '#a3e635',   // garden — yellow-green
+  'tegalan':     '#bef264',
+  'hutan':       '#166534',   // forest — dark green
+  'permukiman':  '#f97316',   // settlement — orange
+  'perumahan':   '#fb923c',
+  'industri':    '#dc2626',   // industrial — red
+  'perdagangan': '#f59e0b',   // commercial — amber
+  'jasa':        '#fbbf24',
+  'sungai':      '#38bdf8',   // water — blue
+  'air':         '#38bdf8',
+  'waduk':       '#0ea5e9',
+  'semak':       '#84cc16',   // shrub
+  'lahan kosong':'#d4d4aa',   // empty land
+  'tanah':       '#d4d4aa',
+  'jalan':       '#94a3b8',   // road — grey-blue
+  'fasilitas':   '#c084fc',   // public facility — purple
+  'pendidikan':  '#a78bfa',
+  'kesehatan':   '#f472b6',
+  'kantor':      '#818cf8',
+};
+
+function getLUColor(props) {
+  const name = (props?.NAMOBJ || props?.namobj || props?.REMARK || props?.remark || '').toLowerCase();
+  for (const [key, color] of Object.entries(LU_COLORS)) {
+    if (name.includes(key)) return color;
+  }
+  // fallback hash
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h},60%,55%)`;
+}
+
+function getStyle(f, hl) {
+  const p = f?.properties || {};
+  const fill = getLUColor(p);
+  return hl
+    ? { color:'#38bdf8', weight:2.5, fillColor:'#38bdf8', fillOpacity:0.35 }
+    : { color:'rgba(255,255,255,0.25)', weight:0.6,
+        fillColor: fill, fillOpacity: wfsOp * 0.72 };
+}
+
+function loadWFS() {
+  const el = document.getElementById('wfs-load');
+  el.classList.add('show');
+  const url = `${GS}/geonode/ows?service=WFS&version=1.0.0&request=GetFeature`
+    + `&typeName=${encodeURIComponent(WFS_LYR)}&outputFormat=application/json&srsName=EPSG:4326`;
+
+  fetch(url)
+    .then(r => { if(!r.ok) throw r.status; return r.json(); })
+    .then(data => {
+      el.classList.remove('show');
+      const n = (data.features||[]).length;
+      document.getElementById('feat-count').textContent = `${n} fitur WFS dimuat`;
+
+      wfsGJ = L.geoJSON(data, {
+        style: f => getStyle(f, false),
+        onEachFeature(feat, lyr) {
+          lyr.on({
+            click(e) {
+              L.DomEvent.stopPropagation(e);
+              if (selLayer) selLayer.setStyle(getStyle(selLayer.feature, false));
+              lyr.setStyle(getStyle(feat, true));
+              selLayer = lyr;
+              showPopup(e.latlng, feat.properties, 'wfs');
+            },
+            mouseover() {
+              if (lyr !== selLayer) lyr.setStyle({weight:2.2, color:'#38bdf8', fillOpacity: wfsOp*0.8});
+            },
+            mouseout() {
+              if (lyr !== selLayer) wfsGJ.resetStyle(lyr);
+            }
+          });
+        }
+      });
+      if (wfsOn) wfsGJ.addTo(map);
+    })
+    .catch(err => {
+      el.classList.remove('show');
+      document.getElementById('feat-count').textContent = 'WFS gagal dimuat';
+      console.warn('WFS error', err);
+    });
+}
+loadWFS();
+
+// ── Popup ─────────────────────────────────
+let openPu = null;
+function showPopup(latlng, props, type) {
+  if (openPu) map.closePopup(openPu);
+  const keys = Object.keys(props||{}).filter(k => props[k]!==null && String(props[k]).trim()!=='');
+  const sorted = [...PRIORITY.filter(k=>keys.includes(k)), ...keys.filter(k=>!PRIORITY.includes(k))].slice(0,10);
+  const title = props?.NAMOBJ || props?.namobj || props?.REMARK || props?.remark || props?.kecamatan || props?.KECAMATAN || (type==='wms'?'GetFeatureInfo':'Fitur WFS');
+  const tagClass = type === 'wms' ? 'ltag wms' : 'ltag wfs';
+  const tagText  = type === 'wms' ? 'WMS' : 'WFS';
+
+  const rows = sorted.map(k =>
+    `<div class="pu-row"><span class="pu-k">${k}</span><span class="pu-v">${props[k]}</span></div>`
+  ).join('') || `<div class="pu-row"><span class="pu-k">Info</span><span class="pu-v">Tidak ada atribut</span></div>`;
+
+  const html = `<div class="pu-wrap">
+    <div class="pu-head">
+      <span class="${tagClass}" style="font-size:9px;padding:2px 6px;">${tagText}</span>
+      <span class="pu-title">${title}</span>
+    </div>
+    <div class="pu-body">${rows}</div>
+  </div>`;
+
+  openPu = L.popup({ className:'custom-popup', closeButton:true, maxWidth:280 })
+    .setLatLng(latlng).setContent(html).openOn(map);
+}
+
+// ── GetFeatureInfo WMS ────────────────────
+let gfiOn = false;
+function toggleGFI() {
+  gfiOn = !gfiOn;
+  const btn = document.getElementById('gfi-btn');
+  btn.classList.toggle('on', gfiOn);
+  btn.innerHTML = gfiOn
+    ? '<span class="gfi-dot"></span>GFI Aktif — klik peta'
+    : '<span class="gfi-dot"></span>GetFeatureInfo';
+  document.getElementById('map').classList.toggle('gfi-cur', gfiOn);
+}
+
+map.on('click', async e => {
+  if (!gfiOn) return;
+  const b = map.getBounds(), sz = map.getSize();
+  const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
+  const cp = map.latLngToContainerPoint(e.latlng);
+  const url = `${GS}/geonode/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo`
+    +`&LAYERS=${encodeURIComponent(WMS_LYR)}&QUERY_LAYERS=${encodeURIComponent(WMS_LYR)}`
+    +`&BBOX=${bbox}&SRS=EPSG:4326&WIDTH=${sz.x}&HEIGHT=${sz.y}`
+    +`&X=${Math.round(cp.x)}&Y=${Math.round(cp.y)}&FEATURE_COUNT=3&INFO_FORMAT=application/json`;
+  try {
+    const res = await fetch(url);
+    const d   = await res.json();
+    const f   = (d.features||[])[0];
+    showPopup(e.latlng, f?.properties || {info:'Tidak ada data'}, 'wms');
+  } catch {
+    showPopup(e.latlng, {error:'GetFeatureInfo gagal (CORS?)'}, 'wms');
+  }
+});
+
+// clear selection on blank click
+map.on('click', e => {
+  if (gfiOn) return;
+  if (selLayer) { selLayer.setStyle(getStyle(selLayer.feature,false)); selLayer=null; }
+});
+
+// ── Controls ──────────────────────────────
+let wmsOn = true, panelOpen = true;
+
+function toggleWMS() {
+  wmsOn = !wmsOn;
+  if(wmsOn) map.addLayer(wmsLayer); else map.removeLayer(wmsLayer);
+  const c = document.getElementById('chk-wms');
+  c.className = wmsOn ? 'chk wms' : 'chk';
+  c.textContent = wmsOn ? '✓' : '';
+}
+function toggleWFS() {
+  wfsOn = !wfsOn;
+  if(wfsGJ){ if(wfsOn) wfsGJ.addTo(map); else map.removeLayer(wfsGJ); }
+  const c = document.getElementById('chk-wfs');
+  c.className = wfsOn ? 'chk wfs' : 'chk';
+  c.textContent = wfsOn ? '✓' : '';
+  if(!wfsOn && openPu) map.closePopup(openPu);
+}
+function setWMSOp(v) {
+  wmsLayer.setOpacity(v/100);
+  document.getElementById('wms-opv').textContent = v+'%';
+}
+function setWFSOp(v) {
+  wfsOp = v/100;
+  document.getElementById('wfs-opv').textContent = v+'%';
+  if(wfsGJ) wfsGJ.setStyle(f=>getStyle(f,false));
+}
+function changeBasemap(k) {
+  map.removeLayer(BM[curBM]); curBM=k;
+  BM[k].addTo(map); BM[k].bringToBack();
+}
+function zoomArea(k) {
+  const a=AREAS[k]; if(a) map.setView(a.c,a.z,{animate:true,duration:0.7});
+}
+function filterLU(keyword) {
+  if (!wfsGJ) return;
+  wfsGJ.eachLayer(lyr => {
+    const props = lyr.feature?.properties || {};
+    const name = (props.NAMOBJ || props.namobj || props.REMARK || props.remark || '').toLowerCase();
+    const show = !keyword || name.includes(keyword);
+    if (lyr._path) lyr._path.style.display = show ? '' : 'none';
+  });
+}
+
+function collapsePanel() {
+  panelOpen = !panelOpen;
+  document.getElementById('pbody').style.display = panelOpen ? '' : 'none';
+  document.getElementById('cbtn').textContent = panelOpen ? '−' : '+';
+}
+</script>
+</body>
+</html>
